@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation; /* Prevents double-tap zoom on mobile */
+        }
+        .student-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 0.5rem; /* CHANGE: Reduced gap for mobile */
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .student-circle {
+            /* CHANGE: Use viewport width (vw) for fluid sizing */
+            width: 8vw;
+            height: 8vw;
+            /* CHANGE: Add max/min widths for usability on all screen sizes */
+            max-width: 50px;
+            max-height: 50px;
+            min-width: 30px;
+            min-height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            user-select: none; /* Prevents text selection on tap */
+            border: 2px solid #e5e7eb; /* gray-200 */
+             /* CHANGE: Font size also scales with viewport */
+            font-size: 3.5vw;
+        }
+
+        /* Media query to ensure font-size doesn't get too big or small */
+        @media (min-width: 640px) {
+            .student-circle {
+                font-size: 1rem; /* 16px */
+            }
+        }
+         @media (max-width: 400px) {
+            .student-circle {
+                font-size: 0.75rem; /* 12px */
+            }
+        }
+
+        .student-circle.present {
+            background-color: #10B981; /* green-500 */
+            color: white;
+            border-color: #059669; /* green-600 */
+        }
+        /* Custom modal styles */
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white rounded-lg shadow-md p-8">
+            <h1 class="text-2xl font-bold text-center mb-6">Attendance Login</h1>
+            <div class="space-y-4">
+                <input type="text" id="login-id" placeholder="Login ID" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="password" id="login-password" placeholder="Password" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="login-button" class="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-600 transition duration-200">Login</button>
+            </div>
+             <p class="text-xs text-gray-500 mt-4 text-center">Forgot your password? Please contact the administrator.</p>
+        </div>
+    </div>
+
+    <!-- Main App Screen (hidden by default) -->
+    <div id="app-screen" class="hidden">
+        <div class="max-w-4xl mx-auto p-4">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h1 class="text-3xl font-bold">Attendance</h1>
+                    <div class="text-right">
+                        <p class="font-semibold" id="current-date"></p>
+                        <p class="text-sm text-gray-500" id="user-info"></p>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label for="sheet-select" class="block text-sm font-medium text-gray-700">Lecture Format</label>
+                        <select id="sheet-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"></select>
+                    </div>
+                    <div>
+                        <label for="batch-select" class="block text-sm font-medium text-gray-700">Batch</label>
+                        <select id="batch-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"></select>
+                    </div>
+                     <div class="flex items-center space-x-2">
+                        <div>
+                           <label for="start-time" class="block text-sm font-medium text-gray-700">Start Time</label>
+                           <input type="time" id="start-time" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        </div>
+                         <div>
+                           <label for="end-time" class="block text-sm font-medium text-gray-700">End Time</label>
+                           <input type="time" id="end-time" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="lecture-by" class="block text-sm font-medium text-gray-700">Lecture By</label>
+                        <input type="text" id="lecture-by" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+
+                <!-- Student Grid -->
+                <div id="student-container" class="student-grid p-2 bg-gray-50 rounded-lg"></div>
+
+                <div class="mt-6 flex justify-end">
+                    <button id="submit-button" class="bg-green-500 text-white font-bold py-2 px-6 rounded-md hover:bg-green-600 transition duration-200">Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal for messages -->
+    <div id="message-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 id="modal-title" class="text-lg leading-6 font-medium text-gray-900"></h3>
+                <div class="mt-2 px-7 py-3">
+                    <p id="modal-message" class="text-sm text-gray-500"></p>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="modal-close" class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- CONFIGURATION ---
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq4w7FA0i3fvUtGJg-gXXP58GdKFuMcLMTvNgdFSb_OBZIj40ylDB2O6QxV1jEOLi_/exec'; // <-- IMPORTANT: PASTE YOUR DEPLOYED SCRIPT URL HERE
+
+        // --- DOM ELEMENTS ---
+        const studentContainer = document.getElementById('student-container');
+        const submitButton = document.getElementById('submit-button');
+        const sheetSelect = document.getElementById('sheet-select');
+        const batchSelect = document.getElementById('batch-select');
+        const dateElement = document.getElementById('current-date');
+        const startTimeEl = document.getElementById('start-time');
+        const endTimeEl = document.getElementById('end-time');
+        const lectureByEl = document.getElementById('lecture-by');
+
+        // Login elements
+        const loginScreen = document.getElementById('login-screen');
+        const appScreen = document.getElementById('app-screen');
+        const loginIdInput = document.getElementById('login-id');
+        const loginPasswordInput = document.getElementById('login-password');
+        const loginButton = document.getElementById('login-button');
+        const userInfoEl = document.getElementById('user-info');
+        
+        // Modal elements
+        const modal = document.getElementById('message-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalClose = document.getElementById('modal-close');
+
+        // --- STATE ---
+        let attendance = {};
+        let currentUser = null; // { name, designation, department }
+
+        // --- FUNCTIONS ---
+        
+        function showMessage(title, message) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modal.classList.remove('hidden');
+        }
+
+        modalClose.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+        
+        // Fetch config and initialize app
+        async function initializeApp() {
+            try {
+                const response = await fetch(SCRIPT_URL + '?action=getConfig');
+                const config = await response.json();
+                
+                if (!config.sheets || !config.batches) {
+                    throw new Error("Invalid configuration received from server.");
+                }
+
+                // Populate dropdowns
+                sheetSelect.innerHTML = config.sheets.map(sheet => `<option value="${sheet}">${sheet}</option>`).join('');
+                batchSelect.innerHTML = config.batches.map(batch => `<option value="${batch.name}">${batch.name}</option>`).join('');
+
+                generateStudentCircles();
+            } catch (error) {
+                console.error('Initialization Error:', error);
+                showMessage('Error', 'Could not load app configuration. Please check your connection and the script URL.');
+            }
+        }
+
+        function generateStudentCircles() {
+            studentContainer.innerHTML = '';
+            attendance = {};
+            for (let i = 1; i <= 100; i++) {
+                const circle = document.createElement('div');
+                circle.className = 'student-circle bg-gray-100 text-gray-700';
+                circle.textContent = i;
+                circle.dataset.roll = i;
+                attendance[i] = 'A'; // Default to Absent
+
+                circle.addEventListener('click', () => {
+                    circle.classList.toggle('present');
+                    if (attendance[i] === 'A') {
+                        attendance[i] = 'P';
+                    } else {
+                        attendance[i] = 'A';
+                    }
+                });
+                studentContainer.appendChild(circle);
+            }
+        }
+        
+        function updateGridForBatch() {
+            const selectedBatch = batchSelect.value;
+            const allCircles = document.querySelectorAll('.student-circle');
+            
+            // Reset all circles first
+            allCircles.forEach(circle => {
+                circle.classList.remove('present', 'opacity-25', 'pointer-events-none');
+                attendance[circle.dataset.roll] = 'A'; // Reset attendance state
+            });
+            
+            if (selectedBatch === 'Batch A') {
+                 allCircles.forEach(circle => {
+                    if (parseInt(circle.dataset.roll) > 50) {
+                        circle.classList.add('opacity-25', 'pointer-events-none');
+                    }
+                });
+            } else if (selectedBatch === 'Batch B') {
+                 allCircles.forEach(circle => {
+                    if (parseInt(circle.dataset.roll) <= 50) {
+                         circle.classList.add('opacity-25', 'pointer-events-none');
+                    }
+                });
+            }
+        }
+
+        async function handleLogin() {
+            const id = loginIdInput.value.trim();
+            const password = loginPasswordInput.value;
+
+            if (!id || !password) {
+                showMessage('Login Failed', 'Please enter both Login ID and Password.');
+                return;
+            }
+
+            loginButton.textContent = 'Logging in...';
+            loginButton.disabled = true;
+
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'login', id, password }),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    currentUser = result.user;
+                    loginScreen.classList.add('hidden');
+                    appScreen.classList.remove('hidden');
+                    userInfoEl.textContent = `Logged in as: ${currentUser.name} (${currentUser.designation})`;
+                    await initializeApp();
+                } else {
+                    showMessage('Login Failed', result.message || 'Invalid credentials.');
+                }
+            } catch (error) {
+                console.error('Login fetch error:', error);
+                showMessage('Error', 'An error occurred while trying to log in.');
+            } finally {
+                loginButton.textContent = 'Login';
+                loginButton.disabled = false;
+            }
+        }
+        
+        async function handleSubmit() {
+            const sheetName = sheetSelect.value;
+            const batchName = batchSelect.value;
+            const startTime = startTimeEl.value;
+            const endTime = endTimeEl.value;
+            const lectureBy = lectureByEl.value.trim();
+            
+            if (!startTime || !endTime || !lectureBy) {
+                showMessage('Missing Information', 'Please fill in Start Time, End Time, and Lecture By fields.');
+                return;
+            }
+
+            const payload = {
+                action: 'submitAttendance',
+                sheetName,
+                batchName,
+                date: new Date().toLocaleDateString('en-GB'), // DD/MM/YYYY
+                startTime,
+                endTime,
+                attendanceData: attendance,
+                attendanceBy: currentUser.name,
+                lectureBy: lectureBy
+            };
+            
+            submitButton.textContent = 'Submitting...';
+            submitButton.disabled = true;
+
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('Success', 'Attendance submitted successfully!');
+                    generateStudentCircles(); 
+                    updateGridForBatch();
+                } else {
+                    throw new Error(result.message || 'Unknown error from server.');
+                }
+            } catch (error) {
+                console.error('Error submitting attendance:', error);
+                showMessage('Submission Failed', `An error occurred: ${error.message}`);
+            } finally {
+                submitButton.textContent = 'Submit';
+                submitButton.disabled = false;
+            }
+        }
+
+        // --- EVENT LISTENERS ---
+        submitButton.addEventListener('click', handleSubmit);
+        batchSelect.addEventListener('change', updateGridForBatch);
+        loginButton.addEventListener('click', handleLogin);
+        // Also allow login with Enter key
+        loginPasswordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleLogin();
+        });
+
+
+        // --- INITIALIZATION ---
+        dateElement.textContent = new Date().toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+
+    </script>
+</body>
+</html>
+
