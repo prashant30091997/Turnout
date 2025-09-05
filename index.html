@@ -30,21 +30,51 @@
             cursor: not-allowed;
             opacity: 0.7;
         }
-        #submit-btn:disabled {
+        #submit-btn:disabled, #login-btn:disabled {
             cursor: not-allowed;
             background-color: #9CA3AF;
         }
         #message-box {
             transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
         }
+        .auth-container {
+            max-width: 400px;
+            margin: auto;
+            text-align: center;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 flex items-center justify-center min-h-screen p-4">
 
-    <main class="bg-white p-6 sm:p-8 rounded-2xl shadow-xl w-full max-w-4xl">
-        <header class="mb-6">
-            <h1 class="text-3xl font-bold text-gray-900">Attendance Tracker</h1>
-            <p class="text-gray-500 mt-1">Select lecture details and mark present students.</p>
+    <!-- Login Screen -->
+    <div id="login-screen" class="auth-container bg-white p-8 rounded-2xl shadow-xl">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
+        <p class="text-gray-600 mb-8">Please enter your credentials to continue.</p>
+        <div class="space-y-4 text-left">
+            <div>
+                <label for="login-id" class="block text-sm font-medium text-gray-700 mb-1">Login ID</label>
+                <input type="text" id="login-id" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input type="password" id="password" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500">
+            </div>
+        </div>
+        <button id="login-btn" class="w-full bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-indigo-700 transition mt-8">
+            <span id="login-btn-text">Sign In</span>
+            <span id="login-btn-spinner" class="hidden"><svg class="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></span>
+        </button>
+        <p class="text-xs text-gray-500 mt-6">Forgot your password? Please contact the administrator to have it reset.</p>
+    </div>
+
+    <!-- Main Application -->
+    <main id="app-screen" class="bg-white p-6 sm:p-8 rounded-2xl shadow-xl w-full max-w-4xl hidden">
+        <header class="mb-6 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Attendance Tracker</h1>
+                <p id="user-display" class="text-gray-500 mt-1">Select lecture details and mark present students.</p>
+            </div>
+            <button id="logout-btn" class="text-sm bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 transition">Logout</button>
         </header>
 
         <!-- Configuration Inputs -->
@@ -72,7 +102,7 @@
             <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                  <div>
                     <label for="attendance-by" class="block text-sm font-medium text-gray-700 mb-1">Attendance Taken By</label>
-                    <input type="text" id="attendance-by" placeholder="Enter name" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500">
+                    <input type="text" id="attendance-by" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm bg-gray-100" readonly>
                 </div>
                  <div>
                     <label for="lecture-by" class="block text-sm font-medium text-gray-700 mb-1">Lecture Taken By</label>
@@ -117,6 +147,17 @@
             }
         };
 
+        // --- DOM Elements ---
+        const loginScreen = document.getElementById('login-screen');
+        const appScreen = document.getElementById('app-screen');
+        const loginBtn = document.getElementById('login-btn');
+        const loginBtnText = document.getElementById('login-btn-text');
+        const loginBtnSpinner = document.getElementById('login-btn-spinner');
+        const loginIdInput = document.getElementById('login-id');
+        const passwordInput = document.getElementById('password');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        const userDisplay = document.getElementById('user-display');
         const studentGrid = document.getElementById('student-grid');
         const dateInput = document.getElementById('lecture-date');
         const startTimeInput = document.getElementById('lecture-start-time');
@@ -132,8 +173,83 @@
         const messageText = document.getElementById('message-text');
         const selectAllBtn = document.getElementById('select-all-btn');
         const deselectAllBtn = document.getElementById('deselect-all-btn');
+        
+        // --- Authentication Logic ---
 
+        const handleLogin = async () => {
+            const loginId = loginIdInput.value.trim();
+            const password = passwordInput.value.trim();
+
+            if (!loginId || !password) {
+                showMessage('Please enter both Login ID and Password.', 'error');
+                return;
+            }
+            
+            setLoginLoading(true);
+
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: 'login', loginId, password })
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    // Save user data in sessionStorage (clears when tab is closed)
+                    sessionStorage.setItem('currentUser', JSON.stringify(result.user));
+                    showAppScreen(result.user);
+                } else {
+                    throw new Error(result.message || 'Login failed.');
+                }
+            } catch (error) {
+                console.error('Login Error:', error);
+                showMessage(error.message, 'error');
+            } finally {
+                setLoginLoading(false);
+            }
+        };
+
+        const handleLogout = () => {
+            sessionStorage.removeItem('currentUser');
+            showLoginScreen();
+        };
+
+        // --- UI Screen Management ---
+        function showLoginScreen() {
+            loginScreen.classList.remove('hidden');
+            appScreen.classList.add('hidden');
+        }
+
+        function showAppScreen(userData) {
+            userDisplay.textContent = `Signed in as ${userData.name}`;
+            attendanceByInput.value = userData.name;
+            loginScreen.classList.add('hidden');
+            appScreen.classList.remove('hidden');
+        }
+
+        function setLoginLoading(isLoading) {
+            loginBtn.disabled = isLoading;
+            loginBtnText.classList.toggle('hidden', isLoading);
+            loginBtnSpinner.classList.toggle('hidden', !isLoading);
+        }
+
+        // --- App Initialization (runs once) ---
         document.addEventListener('DOMContentLoaded', () => {
+            // Check if user is already logged in from a previous session
+            const storedUser = sessionStorage.getItem('currentUser');
+            if (storedUser) {
+                showAppScreen(JSON.parse(storedUser));
+            } else {
+                showLoginScreen();
+            }
+
+            // Event Listeners
+            loginBtn.addEventListener('click', handleLogin);
+            logoutBtn.addEventListener('click', handleLogout);
+            
             populateDropdowns();
             generateStudentGrid();
             setDate();
@@ -146,6 +262,7 @@
             deselectAllBtn.addEventListener('click', () => selectBatch(false));
         });
 
+        // --- Existing App Functions (no major changes) ---
         function populateDropdowns() {
             CONFIG.sheets.forEach(sheetName => {
                 sheetSelect.innerHTML += `<option value="${sheetName}">${sheetName}</option>`;
@@ -212,7 +329,6 @@
         }
 
         async function handleSubmit() {
-            // New validation for all fields
             if (!startTimeInput.value || !endTimeInput.value || !attendanceByInput.value || !lectureByInput.value) {
                 showMessage('Please fill out all time and name fields.', 'error');
                 return;
@@ -228,8 +344,8 @@
                 attendance.push(circle.classList.contains('present'));
             }
 
-            // Updated data payload with all the new fields
             const data = {
+                action: 'submitAttendance', // Tell the script which action to perform
                 sheetName: sheetSelect.value,
                 date: dateInput.value,
                 startTime: startTimeInput.value,
