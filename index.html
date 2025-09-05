@@ -3,364 +3,404 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Attendance App</title>
+    <title>Attendance Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            touch-action: manipulation; /* Prevents double-tap zoom on mobile */
-        }
-        .student-grid {
-            display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            gap: 0.5rem; /* CHANGE: Reduced gap for mobile */
-            max-width: 800px;
-            margin: 0 auto;
         }
         .student-circle {
-            /* CHANGE: Use viewport width (vw) for fluid sizing */
-            width: 8vw;
-            height: 8vw;
-            /* CHANGE: Add max/min widths for usability on all screen sizes */
-            max-width: 50px;
-            max-height: 50px;
-            min-width: 30px;
-            min-height: 30px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.2s ease;
-            user-select: none; /* Prevents text selection on tap */
-            border: 2px solid #e5e7eb; /* gray-200 */
-             /* CHANGE: Font size also scales with viewport */
-            font-size: 3.5vw;
+            transition: all 0.2s ease-in-out;
+            -webkit-tap-highlight-color: transparent;
         }
-
-        /* Media query to ensure font-size doesn't get too big or small */
-        @media (min-width: 640px) {
-            .student-circle {
-                font-size: 1rem; /* 16px */
-            }
+        .student-circle:not(.disabled):hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
-         @media (max-width: 400px) {
-            .student-circle {
-                font-size: 0.75rem; /* 12px */
-            }
-        }
-
         .student-circle.present {
-            background-color: #10B981; /* green-500 */
+            background-color: #34D399; /* Emerald 400 */
             color: white;
-            border-color: #059669; /* green-600 */
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(52, 211, 153, 0.5);
         }
-        /* Custom modal styles */
-        .modal {
-            transition: opacity 0.25s ease;
+        .student-circle.disabled {
+            background-color: #E5E7EB; /* Gray 200 */
+            color: #9CA3AF; /* Gray 400 */
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        #submit-btn:disabled, #login-btn:disabled {
+            cursor: not-allowed;
+            background-color: #9CA3AF;
+        }
+        #message-box {
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+        .auth-container {
+            max-width: 400px;
+            margin: auto;
+            text-align: center;
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-gray-50 text-gray-800 flex items-center justify-center min-h-screen p-4">
 
     <!-- Login Screen -->
-    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
-        <div class="w-full max-w-md bg-white rounded-lg shadow-md p-8">
-            <h1 class="text-2xl font-bold text-center mb-6">Attendance Login</h1>
-            <div class="space-y-4">
-                <input type="text" id="login-id" placeholder="Login ID" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <input type="password" id="login-password" placeholder="Password" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button id="login-button" class="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-600 transition duration-200">Login</button>
+    <div id="login-screen" class="auth-container bg-white p-8 rounded-2xl shadow-xl">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
+        <p class="text-gray-600 mb-8">Please enter your credentials to continue.</p>
+        <div class="space-y-4 text-left">
+            <div>
+                <label for="login-id" class="block text-sm font-medium text-gray-700 mb-1">Login ID</label>
+                <input type="text" id="login-id" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500">
             </div>
-             <p class="text-xs text-gray-500 mt-4 text-center">Forgot your password? Please contact the administrator.</p>
-        </div>
-    </div>
-
-    <!-- Main App Screen (hidden by default) -->
-    <div id="app-screen" class="hidden">
-        <div class="max-w-4xl mx-auto p-4">
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h1 class="text-3xl font-bold">Attendance</h1>
-                    <div class="text-right">
-                        <p class="font-semibold" id="current-date"></p>
-                        <p class="text-sm text-gray-500" id="user-info"></p>
-                    </div>
-                </div>
-
-                <!-- Controls -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div>
-                        <label for="sheet-select" class="block text-sm font-medium text-gray-700">Lecture Format</label>
-                        <select id="sheet-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"></select>
-                    </div>
-                    <div>
-                        <label for="batch-select" class="block text-sm font-medium text-gray-700">Batch</label>
-                        <select id="batch-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"></select>
-                    </div>
-                     <div class="flex items-center space-x-2">
-                        <div>
-                           <label for="start-time" class="block text-sm font-medium text-gray-700">Start Time</label>
-                           <input type="time" id="start-time" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        </div>
-                         <div>
-                           <label for="end-time" class="block text-sm font-medium text-gray-700">End Time</label>
-                           <input type="time" id="end-time" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        </div>
-                    </div>
-                    <div>
-                        <label for="lecture-by" class="block text-sm font-medium text-gray-700">Lecture By</label>
-                        <input type="text" id="lecture-by" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                    </div>
-                </div>
-
-                <!-- Student Grid -->
-                <div id="student-container" class="student-grid p-2 bg-gray-50 rounded-lg"></div>
-
-                <div class="mt-6 flex justify-end">
-                    <button id="submit-button" class="bg-green-500 text-white font-bold py-2 px-6 rounded-md hover:bg-green-600 transition duration-200">Submit</button>
-                </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input type="password" id="password" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500">
             </div>
         </div>
+        <button id="login-btn" class="w-full bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-indigo-700 transition mt-8">
+            <span id="login-btn-text">Sign In</span>
+            <span id="login-btn-spinner" class="hidden"><svg class="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></span>
+        </button>
+        <p class="text-xs text-gray-500 mt-6">Forgot your password? Please contact the administrator to have it reset.</p>
     </div>
-    
-    <!-- Modal for messages -->
-    <div id="message-modal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div class="mt-3 text-center">
-                <h3 id="modal-title" class="text-lg leading-6 font-medium text-gray-900"></h3>
-                <div class="mt-2 px-7 py-3">
-                    <p id="modal-message" class="text-sm text-gray-500"></p>
+
+    <!-- Main Application -->
+    <main id="app-screen" class="bg-white p-6 sm:p-8 rounded-2xl shadow-xl w-full max-w-4xl hidden">
+        <header class="mb-6 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Attendance Tracker</h1>
+                <p id="user-display" class="text-gray-500 mt-1">Select lecture details and mark present students.</p>
+            </div>
+            <button id="logout-btn" class="text-sm bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 transition">Logout</button>
+        </header>
+
+        <!-- Configuration Inputs -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+             <div>
+                <label for="sheet-select" class="block text-sm font-medium text-gray-700 mb-1">Lecture Format</label>
+                <select id="sheet-select" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"></select>
+            </div>
+             <div>
+                <label for="batch-select" class="block text-sm font-medium text-gray-700 mb-1">Student Batch</label>
+                <select id="batch-select" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500"></select>
+            </div>
+             <div>
+                <label for="lecture-date" class="block text-sm font-medium text-gray-700 mb-1">Lecture Date</label>
+                <input type="date" id="lecture-date" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500" readonly>
+            </div>
+            <div>
+                <label for="lecture-start-time" class="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                <input type="time" id="lecture-start-time" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label for="lecture-end-time" class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                <input type="time" id="lecture-end-time" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 <div>
+                    <label for="attendance-by" class="block text-sm font-medium text-gray-700 mb-1">Attendance Taken By</label>
+                    <input type="text" id="attendance-by" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm bg-gray-100" readonly>
                 </div>
-                <div class="items-center px-4 py-3">
-                    <button id="modal-close" class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300">
-                        Close
-                    </button>
+                 <div>
+                    <label for="lecture-by" class="block text-sm font-medium text-gray-700 mb-1">Lecture Taken By</label>
+                    <input type="text" id="lecture-by" placeholder="Enter name" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500">
                 </div>
             </div>
         </div>
-    </div>
 
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-4 mb-6 border-t pt-6">
+            <span class="text-sm font-medium text-gray-600">Actions for selected batch:</span>
+            <button id="select-all-btn" class="text-sm bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 transition">Select All</button>
+            <button id="deselect-all-btn" class="text-sm bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 transition">Deselect All</button>
+        </div>
+
+        <!-- Student Grid -->
+        <div id="student-grid" class="grid grid-cols-10 gap-2 sm:gap-3 md:gap-4 mb-8"></div>
+
+        <!-- Submit Button -->
+        <div class="flex justify-end items-center border-t pt-6">
+             <button id="submit-btn" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200">
+                <span id="btn-text">Submit Attendance</span>
+                <span id="btn-spinner" class="hidden"><svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></span>
+            </button>
+        </div>
+    </main>
+
+    <!-- Floating Message Box -->
+    <div id="message-box" class="fixed top-5 right-5 bg-white p-4 rounded-lg shadow-lg opacity-0 transform translate-y-2 pointer-events-none max-w-sm">
+        <p id="message-text" class="font-medium"></p>
+    </div>
 
     <script>
-        // --- CONFIGURATION ---
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq4w7FA0i3fvUtGJg-gXXP58GdKFuMcLMTvNgdFSb_OBZIj40ylDB2O6QxV1jEOLi_/exec'; // <-- IMPORTANT: PASTE YOUR DEPLOYED SCRIPT URL HERE
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxq4w7FA0i3fvUtGJg-gXXP58GdKFuMcLMTvNgdFSb_OBZIj40ylDB2O6QxV1jEOLi_/exec';
 
-        // --- DOM ELEMENTS ---
-        const studentContainer = document.getElementById('student-container');
-        const submitButton = document.getElementById('submit-button');
-        const sheetSelect = document.getElementById('sheet-select');
-        const batchSelect = document.getElementById('batch-select');
-        const dateElement = document.getElementById('current-date');
-        const startTimeEl = document.getElementById('start-time');
-        const endTimeEl = document.getElementById('end-time');
-        const lectureByEl = document.getElementById('lecture-by');
+        const CONFIG = {
+            sheets: ["Theory", "Clinical", "Hematology", "Tutorial", "SDL-ECE"],
+            batches: {
+                'All': { name: 'All Students (1-100)', start: 1, end: 100 },
+                'A': { name: 'Batch A (1-50)', start: 1, end: 50 },
+                'B': { name: 'Batch B (51-100)', start: 51, end: 100 }
+            }
+        };
 
-        // Login elements
+        // --- DOM Elements ---
         const loginScreen = document.getElementById('login-screen');
         const appScreen = document.getElementById('app-screen');
+        const loginBtn = document.getElementById('login-btn');
+        const loginBtnText = document.getElementById('login-btn-text');
+        const loginBtnSpinner = document.getElementById('login-btn-spinner');
         const loginIdInput = document.getElementById('login-id');
-        const loginPasswordInput = document.getElementById('login-password');
-        const loginButton = document.getElementById('login-button');
-        const userInfoEl = document.getElementById('user-info');
+        const passwordInput = document.getElementById('password');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        const userDisplay = document.getElementById('user-display');
+        const studentGrid = document.getElementById('student-grid');
+        const dateInput = document.getElementById('lecture-date');
+        const startTimeInput = document.getElementById('lecture-start-time');
+        const endTimeInput = document.getElementById('lecture-end-time');
+        const attendanceByInput = document.getElementById('attendance-by');
+        const lectureByInput = document.getElementById('lecture-by');
+        const sheetSelect = document.getElementById('sheet-select');
+        const batchSelect = document.getElementById('batch-select');
+        const submitBtn = document.getElementById('submit-btn');
+        const btnText = document.getElementById('btn-text');
+        const btnSpinner = document.getElementById('btn-spinner');
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+        const selectAllBtn = document.getElementById('select-all-btn');
+        const deselectAllBtn = document.getElementById('deselect-all-btn');
         
-        // Modal elements
-        const modal = document.getElementById('message-modal');
-        const modalTitle = document.getElementById('modal-title');
-        const modalMessage = document.getElementById('modal-message');
-        const modalClose = document.getElementById('modal-close');
+        // --- Authentication Logic ---
 
-        // --- STATE ---
-        let attendance = {};
-        let currentUser = null; // { name, designation, department }
+        const handleLogin = async () => {
+            const loginId = loginIdInput.value.trim();
+            const password = passwordInput.value.trim();
 
-        // --- FUNCTIONS ---
-        
-        function showMessage(title, message) {
-            modalTitle.textContent = title;
-            modalMessage.textContent = message;
-            modal.classList.remove('hidden');
-        }
-
-        modalClose.addEventListener('click', () => {
-            modal.classList.add('hidden');
-        });
-        
-        // Fetch config and initialize app
-        async function initializeApp() {
-            try {
-                const response = await fetch(SCRIPT_URL + '?action=getConfig');
-                const config = await response.json();
-                
-                if (!config.sheets || !config.batches) {
-                    throw new Error("Invalid configuration received from server.");
-                }
-
-                // Populate dropdowns
-                sheetSelect.innerHTML = config.sheets.map(sheet => `<option value="${sheet}">${sheet}</option>`).join('');
-                batchSelect.innerHTML = config.batches.map(batch => `<option value="${batch.name}">${batch.name}</option>`).join('');
-
-                generateStudentCircles();
-            } catch (error) {
-                console.error('Initialization Error:', error);
-                showMessage('Error', 'Could not load app configuration. Please check your connection and the script URL.');
-            }
-        }
-
-        function generateStudentCircles() {
-            studentContainer.innerHTML = '';
-            attendance = {};
-            for (let i = 1; i <= 100; i++) {
-                const circle = document.createElement('div');
-                circle.className = 'student-circle bg-gray-100 text-gray-700';
-                circle.textContent = i;
-                circle.dataset.roll = i;
-                attendance[i] = 'A'; // Default to Absent
-
-                circle.addEventListener('click', () => {
-                    circle.classList.toggle('present');
-                    if (attendance[i] === 'A') {
-                        attendance[i] = 'P';
-                    } else {
-                        attendance[i] = 'A';
-                    }
-                });
-                studentContainer.appendChild(circle);
-            }
-        }
-        
-        function updateGridForBatch() {
-            const selectedBatch = batchSelect.value;
-            const allCircles = document.querySelectorAll('.student-circle');
-            
-            // Reset all circles first
-            allCircles.forEach(circle => {
-                circle.classList.remove('present', 'opacity-25', 'pointer-events-none');
-                attendance[circle.dataset.roll] = 'A'; // Reset attendance state
-            });
-            
-            if (selectedBatch === 'Batch A') {
-                 allCircles.forEach(circle => {
-                    if (parseInt(circle.dataset.roll) > 50) {
-                        circle.classList.add('opacity-25', 'pointer-events-none');
-                    }
-                });
-            } else if (selectedBatch === 'Batch B') {
-                 allCircles.forEach(circle => {
-                    if (parseInt(circle.dataset.roll) <= 50) {
-                         circle.classList.add('opacity-25', 'pointer-events-none');
-                    }
-                });
-            }
-        }
-
-        async function handleLogin() {
-            const id = loginIdInput.value.trim();
-            const password = loginPasswordInput.value;
-
-            if (!id || !password) {
-                showMessage('Login Failed', 'Please enter both Login ID and Password.');
+            if (!loginId || !password) {
+                showMessage('Please enter both Login ID and Password.', 'error');
                 return;
             }
-
-            loginButton.textContent = 'Logging in...';
-            loginButton.disabled = true;
+            
+            setLoginLoading(true);
 
             try {
                 const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    body: JSON.stringify({ action: 'login', id, password }),
-                    headers: { 'Content-Type': 'application/json' }
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: 'login', loginId, password })
                 });
-                const result = await response.json();
 
-                if (result.success) {
-                    currentUser = result.user;
-                    loginScreen.classList.add('hidden');
-                    appScreen.classList.remove('hidden');
-                    userInfoEl.textContent = `Logged in as: ${currentUser.name} (${currentUser.designation})`;
-                    await initializeApp();
+                const result = await response.json();
+                if (result.status === 'success') {
+                    // Save user data in sessionStorage (clears when tab is closed)
+                    sessionStorage.setItem('currentUser', JSON.stringify(result.user));
+                    showAppScreen(result.user);
                 } else {
-                    showMessage('Login Failed', result.message || 'Invalid credentials.');
+                    throw new Error(result.message || 'Login failed.');
                 }
             } catch (error) {
-                console.error('Login fetch error:', error);
-                showMessage('Error', 'An error occurred while trying to log in.');
+                console.error('Login Error:', error);
+                showMessage(error.message, 'error');
             } finally {
-                loginButton.textContent = 'Login';
-                loginButton.disabled = false;
+                setLoginLoading(false);
+            }
+        };
+
+        const handleLogout = () => {
+            sessionStorage.removeItem('currentUser');
+            showLoginScreen();
+        };
+
+        // --- UI Screen Management ---
+        function showLoginScreen() {
+            loginScreen.classList.remove('hidden');
+            appScreen.classList.add('hidden');
+        }
+
+        function showAppScreen(userData) {
+            userDisplay.textContent = `Signed in as ${userData.name}`;
+            attendanceByInput.value = userData.name;
+            loginScreen.classList.add('hidden');
+            appScreen.classList.remove('hidden');
+        }
+
+        function setLoginLoading(isLoading) {
+            loginBtn.disabled = isLoading;
+            loginBtnText.classList.toggle('hidden', isLoading);
+            loginBtnSpinner.classList.toggle('hidden', !isLoading);
+        }
+
+        // --- App Initialization (runs once) ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if user is already logged in from a previous session
+            const storedUser = sessionStorage.getItem('currentUser');
+            if (storedUser) {
+                showAppScreen(JSON.parse(storedUser));
+            } else {
+                showLoginScreen();
+            }
+
+            // Event Listeners
+            loginBtn.addEventListener('click', handleLogin);
+            logoutBtn.addEventListener('click', handleLogout);
+            
+            populateDropdowns();
+            generateStudentGrid();
+            setDate();
+            updateBatchView(); 
+
+            studentGrid.addEventListener('click', handleCircleClick);
+            batchSelect.addEventListener('change', updateBatchView);
+            submitBtn.addEventListener('click', handleSubmit);
+            selectAllBtn.addEventListener('click', () => selectBatch(true));
+            deselectAllBtn.addEventListener('click', () => selectBatch(false));
+        });
+
+        // --- Existing App Functions (no major changes) ---
+        function populateDropdowns() {
+            CONFIG.sheets.forEach(sheetName => {
+                sheetSelect.innerHTML += `<option value="${sheetName}">${sheetName}</option>`;
+            });
+            Object.keys(CONFIG.batches).forEach(batchKey => {
+                batchSelect.innerHTML += `<option value="${batchKey}">${CONFIG.batches[batchKey].name}</option>`;
+            });
+        }
+        
+        function generateStudentGrid() {
+             for (let i = 1; i <= 100; i++) {
+                const circle = document.createElement('div');
+                circle.className = 'student-circle flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 bg-gray-100 rounded-full cursor-pointer font-medium text-gray-600 select-none';
+                circle.textContent = i;
+                circle.dataset.id = i;
+                studentGrid.appendChild(circle);
             }
         }
         
+        function setDate() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            dateInput.value = `${yyyy}-${mm}-${dd}`;
+        }
+        
+        function updateBatchView() {
+            const selectedBatchKey = batchSelect.value;
+            const batch = CONFIG.batches[selectedBatchKey];
+
+            for(let i = 1; i <= 100; i++) {
+                const circle = studentGrid.querySelector(`[data-id='${i}']`);
+                const isInBatch = i >= batch.start && i <= batch.end;
+                
+                if (isInBatch) {
+                    circle.classList.remove('disabled');
+                } else {
+                    circle.classList.add('disabled');
+                    circle.classList.remove('present');
+                }
+            }
+        }
+
+        function handleCircleClick(event) {
+            const circle = event.target.closest('.student-circle');
+            if (circle && !circle.classList.contains('disabled')) {
+                circle.classList.toggle('present');
+            }
+        }
+
+        function selectBatch(isPresent) {
+            const selectedBatchKey = batchSelect.value;
+            const batch = CONFIG.batches[selectedBatchKey];
+
+            for (let i = batch.start; i <= batch.end; i++) {
+                const circle = studentGrid.querySelector(`[data-id='${i}']`);
+                if (isPresent) {
+                    circle.classList.add('present');
+                } else {
+                    circle.classList.remove('present');
+                }
+            }
+        }
+
         async function handleSubmit() {
-            const sheetName = sheetSelect.value;
-            const batchName = batchSelect.value;
-            const startTime = startTimeEl.value;
-            const endTime = endTimeEl.value;
-            const lectureBy = lectureByEl.value.trim();
-            
-            if (!startTime || !endTime || !lectureBy) {
-                showMessage('Missing Information', 'Please fill in Start Time, End Time, and Lecture By fields.');
+            if (!startTimeInput.value || !endTimeInput.value || !attendanceByInput.value || !lectureByInput.value) {
+                showMessage('Please fill out all time and name fields.', 'error');
+                return;
+            }
+            if (SCRIPT_URL === 'PASTE_YOUR_WEB_APP_URL_HERE') {
+                showMessage('Please configure the SCRIPT_URL in the HTML file.', 'error');
                 return;
             }
 
-            const payload = {
-                action: 'submitAttendance',
-                sheetName,
-                batchName,
-                date: new Date().toLocaleDateString('en-GB'), // DD/MM/YYYY
-                startTime,
-                endTime,
-                attendanceData: attendance,
-                attendanceBy: currentUser.name,
-                lectureBy: lectureBy
+            const attendance = [];
+            for (let i = 1; i <= 100; i++) {
+                const circle = studentGrid.querySelector(`[data-id='${i}']`);
+                attendance.push(circle.classList.contains('present'));
+            }
+
+            const data = {
+                action: 'submitAttendance', // Tell the script which action to perform
+                sheetName: sheetSelect.value,
+                date: dateInput.value,
+                startTime: startTimeInput.value,
+                endTime: endTimeInput.value,
+                batch: batchSelect.value,
+                attendance: attendance,
+                attendanceBy: attendanceByInput.value,
+                lectureBy: lectureByInput.value
             };
-            
-            submitButton.textContent = 'Submitting...';
-            submitButton.disabled = true;
+
+            setLoading(true);
 
             try {
                 const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    body: JSON.stringify(payload),
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(data)
                 });
                 const result = await response.json();
-                
-                if (result.success) {
-                    showMessage('Success', 'Attendance submitted successfully!');
-                    generateStudentCircles(); 
-                    updateGridForBatch();
+                if (result.status === 'success') {
+                    showMessage(result.message, 'success');
                 } else {
-                    throw new Error(result.message || 'Unknown error from server.');
+                    throw new Error(result.message || 'An unknown error occurred.');
                 }
             } catch (error) {
                 console.error('Error submitting attendance:', error);
-                showMessage('Submission Failed', `An error occurred: ${error.message}`);
+                showMessage(`Error: ${error.message}`, 'error');
             } finally {
-                submitButton.textContent = 'Submit';
-                submitButton.disabled = false;
+                setLoading(false);
             }
         }
 
-        // --- EVENT LISTENERS ---
-        submitButton.addEventListener('click', handleSubmit);
-        batchSelect.addEventListener('change', updateGridForBatch);
-        loginButton.addEventListener('click', handleLogin);
-        // Also allow login with Enter key
-        loginPasswordInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleLogin();
-        });
-
-
-        // --- INITIALIZATION ---
-        dateElement.textContent = new Date().toLocaleDateString('en-US', {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-        });
-
+        function setLoading(isLoading) {
+            submitBtn.disabled = isLoading;
+            btnText.classList.toggle('hidden', isLoading);
+            btnSpinner.classList.toggle('hidden', !isLoading);
+        }
+        
+        let messageTimeout;
+        function showMessage(message, type = 'success') {
+            clearTimeout(messageTimeout);
+            messageText.textContent = message;
+            messageBox.className = 'fixed top-5 right-5 p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300';
+            if (type === 'success') {
+                messageBox.classList.add('bg-green-100', 'text-green-800');
+            } else {
+                messageBox.classList.add('bg-red-100', 'text-red-800');
+            }
+            messageBox.classList.remove('opacity-0', 'translate-y-2');
+            messageTimeout = setTimeout(() => {
+                messageBox.classList.add('opacity-0', 'translate-y-2');
+            }, 4000);
+        }
     </script>
 </body>
 </html>
