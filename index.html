@@ -126,7 +126,9 @@
                 title: 'BSc Paramedic Attendance',
                 totalStudents: 23,
                 notJoined: [13, 17, 19],
-                sheets: ["Turnout"],
+                // --- CHANGE ---
+                // Replaced "Turnout" with the three new module names.
+                sheets: ["Theory", "Clinical", "Hematology"],
                 batches: {},
                 showBatches: false
             }
@@ -145,7 +147,6 @@
         const logoutBtn = document.getElementById('logout-btn');
         const submitButton = document.getElementById('submit-button');
         const studentGrid = document.getElementById('student-grid');
-        // ... other elements
         const appTitle = document.getElementById('app-title');
         const userInfoEl = document.getElementById('user-info');
         const loginIdInput = document.getElementById('login-id');
@@ -227,7 +228,6 @@
             appTitle.textContent = currentConfig.title;
             userInfoEl.textContent = `Logged in as: ${currentUser.name}`;
 
-            // Populate dropdowns
             sheetSelect.innerHTML = currentConfig.sheets.map(s => `<option value="${s}">${s}</option>`).join('');
             if (currentConfig.showBatches) {
                 batchSelectContainer.classList.remove('hidden');
